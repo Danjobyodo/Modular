@@ -2,7 +2,14 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>楕円曲線とモジュラー曲線の加法可視化 (範囲修正版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>楕円曲線とモジュラー曲線の加法可視化</title>
+
+    <!-- アイコン設定 -->
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <!-- 数式表示用のMathJax -->
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <style>
@@ -43,6 +50,8 @@
             border: 1px solid #ddd;
             background-color: #fafafa;
             cursor: crosshair;
+            /* タッチデバイスでのドラッグ中に画面がスクロールするのを防ぐ */
+            touch-action: none;
         }
         .panel {
             max-width: 1000px;
@@ -54,6 +63,7 @@
             font-family: monospace;
             font-size: 1.1em;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            overflow-x: auto;
         }
         .highlight { color: #e5c07b; }
         .green { color: #98c379; }
@@ -66,8 +76,7 @@
     <div class="description">
         <p>
             格子 \(\Lambda = \mathbb{Z} + i\mathbb{Z}\) に対応する楕円曲線（左図）と、複素トーラス \(\mathbb{C}/\Lambda\)（右図）の対応関係です。<br>
-            <strong>変更点:</strong> 右側のトーラスの表示範囲を \([-0.1, 1.1] + [-0.1, 1.1]i\) に広げ、基本領域（グレーの正方形）を中央に配置しました。
-            これに伴い、境界をまたいで<strong>同値な点（周期的に同じ位置にある点）が複数存在する場合は、すべて同時に描画</strong>されます。
+            <strong>操作:</strong> 左側のグラフ上の <strong>点A（緑）</strong> または <strong>点B（紫）</strong> をドラッグ（またはスワイプ）して動かしてみてください。
         </p>
         <ul style="margin-top: 5px;">
             <li>右に開いた曲線は、トーラス上の <strong>実軸（\(v=0\) および \(v=1\) の青線）</strong> に対応します。</li>
@@ -88,42 +97,37 @@
     </div>
 
     <div class="panel" id="infoPanel">
-        </div>
+        <!-- 情報がここに動的に表示されます -->
+    </div>
 
 <script>
     // 定数の定義
-    const g2 = 189.072720129; // 60 * G4(Z[i])
-    const e1 = Math.sqrt(g2 / 4); // 約 6.8749
+    const g2 = 189.072720129;
+    const e1 = Math.sqrt(g2 / 4);
 
-    // キャンバスのコンテキストとサイズ設定
     const c1 = document.getElementById('curveCanvas');
     const ctx1 = c1.getContext('2d');
     const c2 = document.getElementById('torusCanvas');
     const ctx2 = c2.getContext('2d');
 
     // 座標系の設定
-    // 楕円曲線 (X_MIN ~ X_MAX, Y_MIN ~ Y_MAX)
     const X_MIN = -12, X_MAX = 22;
     const Y_MIN = -45, Y_MAX = 45;
     const cx = x => (x - X_MIN) / (X_MAX - X_MIN) * c1.width;
     const cy = y => c1.height - (y - Y_MIN) / (Y_MAX - Y_MIN) * c1.height;
 
-    // トーラス (U_MIN ~ U_MAX, V_MIN ~ V_MAX) -> ご指定の [-0.1, 1.1] に設定
     const U_MIN = -0.1, U_MAX = 1.1;
     const V_MIN = -0.1, V_MAX = 1.1;
     const cu = u => (u - U_MIN) / (U_MAX - U_MIN) * c2.width;
     const cv = v => c2.height - (v - V_MIN) / (V_MAX - V_MIN) * c2.height;
 
-    // 描画用の曲線ポイント配列
     const pathLeft = [];
     const pathRight = [];
     const allCurvePoints = [];
 
-    // トーラスへの写像のスケール計算
     let scaleRight = 1, scaleLeft = 1;
 
     function initMath() {
-        // 右側ブランチ (x >= e1) の u=0.5 までの積分値を事前計算してスケールを合わせる
         let maxRightIntegral = 0;
         let s_limit = 1 / Math.sqrt(e1);
         const steps = 2000;
@@ -134,7 +138,6 @@
         }
         scaleRight = 0.5 / maxRightIntegral;
 
-        // 左側ループ (-e1 <= x <= 0) の積分値
         let maxLeftIntegral = 0;
         let dx = e1 / steps;
         for(let i=0; i<steps; i++) {
@@ -143,7 +146,6 @@
         }
         scaleLeft = 0.5 / maxLeftIntegral;
 
-        // パスの生成 (左ループ)
         for (let i=0; i<=300; i++) {
             let phi = (i / 300) * 2 * Math.PI;
             let x = -e1 * (1 + Math.cos(phi)) / 2;
@@ -154,7 +156,6 @@
             allCurvePoints.push({x, y});
         }
 
-        // パスの生成 (右ブランチ)
         const rightHalf = [];
         for (let i=0; i<=300; i++) {
             let t = i / 300;
@@ -173,7 +174,6 @@
         }
     }
 
-    // 楕円積分を用いて (x, y) をトーラス上の (u, v) にマッピングする
     function xyToUV(x, y) {
         if (x >= e1 - 1e-4) {
             x = Math.max(x, e1);
@@ -206,7 +206,6 @@
         return null;
     }
 
-    // 楕円曲線上での幾何学的な点の加算
     function addPointsGeom(A, B) {
         const TOL = 1e-5;
         let m;
@@ -223,7 +222,6 @@
         return {x: xC, y: -yC};
     }
 
-    // トーラス上での複素数の加算
     function addUV(uv1, uv2) {
         if (!uv1 || !uv2) return null;
         let u = uv1.u + uv2.u;
@@ -231,7 +229,6 @@
         return {u, v};
     }
 
-    // 操作用変数
     let pointA = {x: 8.52, y: 30};
     let pointB = {x: -3.437, y: 0};
     let dragTarget = null;
@@ -250,56 +247,87 @@
         return bestPt;
     }
 
-    // イベントリスナー
-    c1.addEventListener('mousedown', (e) => {
-        let rect = c1.getBoundingClientRect();
-        let mx = e.clientX - rect.left;
-        let my = e.clientY - rect.top;
-        
+    // イベントの座標を取得するヘルパー関数（マウスとタッチ両対応）
+    function getEventPos(e, canvas) {
+        let rect = canvas.getBoundingClientRect();
+        let clientX = e.clientX;
+        let clientY = e.clientY;
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        }
+        return {
+            mx: clientX - rect.left,
+            my: clientY - rect.top
+        };
+    }
+
+    // ドラッグ開始（マウス＆タッチ）
+    function handleStart(e) {
+        let { mx, my } = getEventPos(e, c1);
         let pA_x = cx(pointA.x), pA_y = cy(pointA.y);
         let pB_x = cx(pointB.x), pB_y = cy(pointB.y);
 
-        if ((mx-pA_x)**2 + (my-pA_y)**2 < 100) dragTarget = 'A';
-        else if ((mx-pB_x)**2 + (my-pB_y)**2 < 100) dragTarget = 'B';
-    });
+        // 指での操作を考慮し、タッチイベントの場合は当たり判定を少し広くする (20px)
+        let hitRadiusSq = e.type.includes('touch') ? 400 : 100;
 
-    window.addEventListener('mousemove', (e) => {
+        if ((mx-pA_x)**2 + (my-pA_y)**2 < hitRadiusSq) {
+            dragTarget = 'A';
+            if(e.type.includes('touch')) e.preventDefault(); // カスタムドラッグ中はデフォルト動作を防止
+        }
+        else if ((mx-pB_x)**2 + (my-pB_y)**2 < hitRadiusSq) {
+            dragTarget = 'B';
+            if(e.type.includes('touch')) e.preventDefault();
+        }
+    }
+
+    // ドラッグ中（マウス＆タッチ）
+    function handleMove(e) {
         if (!dragTarget) return;
-        let rect = c1.getBoundingClientRect();
-        let mx = e.clientX - rect.left;
-        let my = e.clientY - rect.top;
+        if (e.type.includes('touch')) e.preventDefault(); // スクロール防止
+        
+        let { mx, my } = getEventPos(e, c1);
         let closest = getClosestPoint(mx, my);
         if (dragTarget === 'A') pointA = closest;
         if (dragTarget === 'B') pointB = closest;
         render();
-    });
+    }
 
-    window.addEventListener('mouseup', () => { dragTarget = null; });
+    // ドラッグ終了（マウス＆タッチ）
+    function handleEnd(e) {
+        dragTarget = null;
+    }
 
-    // 楕円曲線キャンバスの描画
+    // PC用マウスイベント
+    c1.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+
+    // モバイル用タッチイベント
+    c1.addEventListener('touchstart', handleStart, { passive: false });
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleEnd);
+    window.addEventListener('touchcancel', handleEnd);
+
     function drawCurveCanvas(C) {
         ctx1.clearRect(0, 0, c1.width, c1.height);
         
-        // グリッドと軸
         ctx1.strokeStyle = '#e0e0e0'; ctx1.lineWidth = 1;
         ctx1.beginPath();
         ctx1.moveTo(0, cy(0)); ctx1.lineTo(c1.width, cy(0));
         ctx1.moveTo(cx(0), 0); ctx1.lineTo(cx(0), c1.height);
         ctx1.stroke();
 
-        // 曲線描画 (左ループ: 赤)
         ctx1.strokeStyle = '#d32f2f'; ctx1.lineWidth = 3;
         ctx1.beginPath();
         pathLeft.forEach((p, i) => i===0 ? ctx1.moveTo(cx(p.x), cy(p.y)) : ctx1.lineTo(cx(p.x), cy(p.y)));
         ctx1.stroke();
 
-        // 曲線描画 (右ブランチ: 青)
         ctx1.strokeStyle = '#1976d2';
         ctx1.beginPath();
         pathRight.forEach((p, i) => i===0 ? ctx1.moveTo(cx(p.x), cy(p.y)) : ctx1.lineTo(cx(p.x), cy(p.y)));
         ctx1.stroke();
 
-        // 加算の幾何学的ライン描画
         if (C) {
             let isSame = Math.abs(pointA.x - pointB.x) < 1e-3 && Math.abs(pointA.y - pointB.y) < 1e-3;
             let m = isSame ? (12*pointA.x*pointA.x - g2)/(2*pointA.y) : (pointB.y - pointA.y)/(pointB.x - pointA.x);
@@ -327,20 +355,16 @@
             ctx1.fill(); ctx1.stroke();
         }
 
-        // 点 A (緑) と B (紫)
         ctx1.fillStyle = '#4caf50'; ctx1.beginPath(); ctx1.arc(cx(pointA.x), cy(pointA.y), 7, 0, 2*Math.PI); ctx1.fill();
         ctx1.fillStyle = '#9c27b0'; ctx1.beginPath(); ctx1.arc(cx(pointB.x), cy(pointB.y), 7, 0, 2*Math.PI); ctx1.fill();
     }
 
-    // トーラスキャンバスの描画
     function drawTorusCanvas(uvA, uvB, uvC_geom, uvC_torus) {
         ctx2.clearRect(0, 0, c2.width, c2.height);
         
-        // 1. 基本領域 [0, 1] x [0, 1] の背景をグレーでハイライト
         ctx2.fillStyle = '#eaeaea';
         ctx2.fillRect(cu(0), cv(1), cu(1) - cu(0), cv(0) - cv(1));
         
-        // 2. 格子の境界線 (u=0, 1 / v=0, 1) の描画
         ctx2.strokeStyle = '#b0bec5'; ctx2.lineWidth = 1.5;
         ctx2.beginPath();
         ctx2.moveTo(cu(0), 0); ctx2.lineTo(cu(0), c2.height);
@@ -349,24 +373,19 @@
         ctx2.moveTo(0, cv(1)); ctx2.lineTo(c2.width, cv(1));
         ctx2.stroke();
 
-        // 3. 実軌道の軌跡描画 (範囲内の同値な線をすべて描画)
-        // v = 0, 1 は青線 (右ブランチに対応)
         ctx2.strokeStyle = '#1976d2'; ctx2.lineWidth = 2;
         [0, 1].forEach(v => {
             ctx2.beginPath(); ctx2.moveTo(0, cv(v)); ctx2.lineTo(c2.width, cv(v)); ctx2.stroke();
         });
-        // v = 0.5 は赤線 (左ループに対応)
+        
         ctx2.strokeStyle = '#d32f2f';
         ctx2.beginPath(); ctx2.moveTo(0, cv(0.5)); ctx2.lineTo(c2.width, cv(0.5)); ctx2.stroke();
 
-        // 4. 点を周期的にすべて描画するヘルパー関数
         const drawPtAllEquiv = (uv, color, radius=7, stroke=null) => {
             if(!uv) return;
-            // 0 ~ 1 の範囲に標準化 (基本領域内の座標にする)
             let u0 = uv.u - Math.floor(uv.u);
             let v0 = uv.v - Math.floor(uv.v);
 
-            // 表示範囲 [-0.1, 1.1] に収まる同値な点を全探索して描画
             for (let k = -1; k <= 2; k++) {
                 for (let m = -1; m <= 2; m++) {
                     let u = u0 + k;
@@ -381,20 +400,16 @@
             }
         };
 
-        // A+Bの描画 (幾何計算結果 = 黄色、トーラス和 = 黒の大きい点)
         if (uvC_torus) drawPtAllEquiv(uvC_torus, '#000', 9);
         if (uvC_geom) drawPtAllEquiv(uvC_geom, '#ffd54f', 5);
 
-        // 点A (緑) と 点B (紫)
         drawPtAllEquiv(uvA, '#4caf50');
         drawPtAllEquiv(uvB, '#9c27b0');
     }
 
-    // パネル情報の更新
     function updateInfo(C, uvA, uvB, uvC_geom, uvC_torus) {
         const info = document.getElementById('infoPanel');
         const fX = v => v.toFixed(2).padStart(6, ' ');
-        // 表示用に 0 ~ 1 に丸めた値を返す関数
         const fU = v => {
             let normalized = v - Math.floor(v);
             return normalized.toFixed(3).padStart(6, ' ');
@@ -436,7 +451,6 @@
         updateInfo(C_geom, uvA, uvB, uvC_geom, uvC_torus);
     }
 
-    // 初期化実行
     initMath();
     pointA = getClosestPoint(cx(8.5), cy(-23));
     pointB = getClosestPoint(cx(-3), cy(15));
